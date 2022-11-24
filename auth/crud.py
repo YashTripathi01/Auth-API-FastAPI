@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from . import models, schemas, utils
+from auth import models, schemas, utils
 
 
 def get_user_by_email(db: Session, email: str):
@@ -28,18 +28,17 @@ def register_user(db: Session, request: schemas.RegisterUser):
     return user
 
 
-def login_user(db: Session, request: schemas.LoginUser):
-    user_exists = get_user_by_email(db=db, email=request.email)
-
-    if not user_exists:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid Credentials.')
-
+def login_user(db: Session, request: schemas.LoginUser, existing_user: schemas.LoginUser):
     verify_password = utils.verify_hash(
-        hashed_password=user_exists.password, plain_password=request.password)
+        hashed_password=existing_user.password, plain_password=request.password)
 
     if not verify_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid Credentials.')
 
-    return {'msg': 'Login successful'}
+    to_encode = {'id': existing_user.id,
+                 'name': existing_user.name, 'email': existing_user.email}
+
+    token = utils.create_access_token(data=to_encode)
+
+    return {'access_token': token, "token_type": "bearer"}
